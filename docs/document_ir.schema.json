@@ -1,0 +1,639 @@
+{
+  "$defs": {
+    "Block": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target"
+        },
+        "bbox_pdf_pt": {
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Bbox Pdf Pt",
+          "type": "array"
+        },
+        "bbox_unrotated": {
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Bbox Unrotated",
+          "type": "array"
+        },
+        "layout_bbox": {
+          "anyOf": [
+            {
+              "maxItems": 4,
+              "minItems": 4,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Layout Bbox"
+        },
+        "coordinates": {
+          "default": "top_left_points_after_rotation_normalization",
+          "title": "Coordinates",
+          "type": "string"
+        },
+        "reading_order": {
+          "title": "Reading Order",
+          "type": "integer"
+        },
+        "role": {
+          "default": "paragraph",
+          "enum": [
+            "heading",
+            "paragraph",
+            "caption",
+            "footnote",
+            "table_cell",
+            "equation",
+            "other"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "direction": {
+          "default": "horizontal",
+          "enum": [
+            "horizontal",
+            "vertical",
+            "rotated"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "font_family": {
+          "default": "Helvetica",
+          "title": "Font Family",
+          "type": "string"
+        },
+        "font_size_pt": {
+          "default": 11,
+          "exclusiveMinimum": 0,
+          "title": "Font Size Pt",
+          "type": "number"
+        },
+        "font_weight": {
+          "default": "normal",
+          "enum": [
+            "normal",
+            "bold"
+          ],
+          "title": "Font Weight",
+          "type": "string"
+        },
+        "italic": {
+          "default": false,
+          "title": "Italic",
+          "type": "boolean"
+        },
+        "rgb": {
+          "default": "#222222",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "title": "Rgb",
+          "type": "string"
+        },
+        "alignment": {
+          "default": "left",
+          "enum": [
+            "left",
+            "center",
+            "right"
+          ],
+          "title": "Alignment",
+          "type": "string"
+        },
+        "line_height_pt": {
+          "default": 13,
+          "title": "Line Height Pt",
+          "type": "number"
+        },
+        "source_confidence": {
+          "default": 1,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Source Confidence",
+          "type": "number"
+        },
+        "segmentation_confidence": {
+          "default": 0.8,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Segmentation Confidence",
+          "type": "number"
+        },
+        "translation_status": {
+          "default": "pending",
+          "enum": [
+            "pending",
+            "translated",
+            "edited",
+            "protected",
+            "failed"
+          ],
+          "title": "Translation Status",
+          "type": "string"
+        },
+        "protection_mode": {
+          "default": "translate",
+          "enum": [
+            "translate",
+            "protect",
+            "ignore"
+          ],
+          "title": "Protection Mode",
+          "type": "string"
+        },
+        "override_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Override Reason"
+        },
+        "protected_spans": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Protected Spans",
+          "type": "object"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "spans": {
+          "items": {
+            "$ref": "#/$defs/Span"
+          },
+          "title": "Spans",
+          "type": "array"
+        },
+        "table_cell": {
+          "anyOf": [
+            {
+              "maxItems": 4,
+              "minItems": 4,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Table Cell"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Id"
+        },
+        "origin": {
+          "default": "native",
+          "enum": [
+            "native",
+            "ocr"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "fitted_font_size": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fitted Font Size"
+        }
+      },
+      "required": [
+        "id",
+        "source",
+        "bbox_pdf_pt",
+        "bbox_unrotated",
+        "reading_order"
+      ],
+      "title": "Block",
+      "type": "object"
+    },
+    "DocumentInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        },
+        "source_lang": {
+          "const": "ja",
+          "default": "ja",
+          "title": "Source Lang",
+          "type": "string"
+        },
+        "target_lang": {
+          "const": "en",
+          "default": "en",
+          "title": "Target Lang",
+          "type": "string"
+        },
+        "page_count": {
+          "title": "Page Count",
+          "type": "integer"
+        },
+        "filename": {
+          "title": "Filename",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sha256",
+        "page_count",
+        "filename"
+      ],
+      "title": "DocumentInfo",
+      "type": "object"
+    },
+    "Glyph": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "bbox": {
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Bbox",
+          "type": "array"
+        },
+        "origin": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Origin",
+          "type": "array"
+        }
+      },
+      "required": [
+        "text",
+        "bbox",
+        "origin"
+      ],
+      "title": "Glyph",
+      "type": "object"
+    },
+    "Page": {
+      "additionalProperties": false,
+      "properties": {
+        "page_index": {
+          "title": "Page Index",
+          "type": "integer"
+        },
+        "width_pt": {
+          "title": "Width Pt",
+          "type": "number"
+        },
+        "height_pt": {
+          "title": "Height Pt",
+          "type": "number"
+        },
+        "media_box": {
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Media Box",
+          "type": "array"
+        },
+        "crop_box": {
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Crop Box",
+          "type": "array"
+        },
+        "crop_offset": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Crop Offset",
+          "type": "array"
+        },
+        "rotation": {
+          "enum": [
+            0,
+            90,
+            180,
+            270
+          ],
+          "title": "Rotation",
+          "type": "integer"
+        },
+        "classification": {
+          "enum": [
+            "native",
+            "mixed",
+            "scan",
+            "empty",
+            "needs_review"
+          ],
+          "title": "Classification",
+          "type": "string"
+        },
+        "extraction_confidence": {
+          "default": 1,
+          "title": "Extraction Confidence",
+          "type": "number"
+        },
+        "blocks": {
+          "items": {
+            "$ref": "#/$defs/Block"
+          },
+          "title": "Blocks",
+          "type": "array"
+        },
+        "obstacles": {
+          "items": {
+            "maxItems": 4,
+            "minItems": 4,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Obstacles",
+          "type": "array"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "page_index",
+        "width_pt",
+        "height_pt",
+        "media_box",
+        "crop_box",
+        "crop_offset",
+        "rotation",
+        "classification"
+      ],
+      "title": "Page",
+      "type": "object"
+    },
+    "Span": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "bbox": {
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Bbox",
+          "type": "array"
+        },
+        "font": {
+          "title": "Font",
+          "type": "string"
+        },
+        "size": {
+          "title": "Size",
+          "type": "number"
+        },
+        "flags": {
+          "default": 0,
+          "title": "Flags",
+          "type": "integer"
+        },
+        "color": {
+          "default": 0,
+          "title": "Color",
+          "type": "integer"
+        },
+        "glyphs": {
+          "items": {
+            "$ref": "#/$defs/Glyph"
+          },
+          "title": "Glyphs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "text",
+        "bbox",
+        "font",
+        "size"
+      ],
+      "title": "Span",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "segmentation_version": {
+      "default": "1.0",
+      "title": "Segmentation Version",
+      "type": "string"
+    },
+    "document": {
+      "$ref": "#/$defs/DocumentInfo"
+    },
+    "pages": {
+      "items": {
+        "$ref": "#/$defs/Page"
+      },
+      "title": "Pages",
+      "type": "array"
+    }
+  },
+  "required": [
+    "document",
+    "pages"
+  ],
+  "title": "DocumentIR",
+  "type": "object"
+}
