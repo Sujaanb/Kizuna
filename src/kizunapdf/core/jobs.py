@@ -19,7 +19,7 @@ from kizunapdf.providers.mlx_translategemma import get_translator
 from .cache import TranslationCache
 from .export import write_bundle
 from .extract import extract
-from .latex import build_pages
+from .latex import TypesettingError, build_pages
 from .models import DocumentIR, QAReport
 from .protect import japanese, protect, restore, restore_verified_literals
 from .qa import run_qa
@@ -302,7 +302,11 @@ class JobManager:
             (work / "translated.pdf").unlink(missing_ok=True)
             report = QAReport()
             severity = "needs_review" if isinstance(e, ValueError) else "failed"
-            report.add(severity, "pipeline", str(e)[:2000])
+            if isinstance(e, TypesettingError):
+                for diagnostic in e.diagnostics:
+                    report.add(**diagnostic.model_dump())
+            else:
+                report.add(severity, "pipeline", str(e)[:2000])
             write_json(work / "qa_report.json", report.model_dump())
             self.update(
                 job_id,

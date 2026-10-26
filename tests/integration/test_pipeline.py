@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import platform
 
 import pikepdf
@@ -140,6 +141,27 @@ def test_overflow_and_cancellation(fixture_dir, tmp_path):
     assert manager.process(j2)["status"] == "cancelled"
 
 
+def test_overflow_reports_regions_on_every_affected_page(fixture_dir, tmp_path):
+    source = tmp_path / "two_pages.pdf"
+    with pikepdf.open(fixture_dir / "native.pdf") as pdf:
+        pdf.pages.append(pdf.pages[0])
+        pdf.save(source)
+    manager = JobManager(Settings(data_dir=tmp_path / "jobs"), FakeTranslator(fixtures.REFERENCES))
+    job = manager.create(source)["id"]
+    ir = manager.ir(job)
+    expected = set()
+    for page in ir.pages:
+        block = page.blocks[0]
+        block.target = "M" * 25
+        block.translation_status = "edited"
+        expected.add((page.page_index, block.id))
+    manager.save_ir(job, ir)
+    assert not manager.process(job)["output_available"]
+    report = json.loads((manager.folder(job) / "qa_report.json").read_text())
+    assert {(d["page"], d["block_id"]) for d in report["diagnostics"]} == expected
+    assert all(d["check"] == "text_overflow" for d in report["diagnostics"])
+
+
 def test_inference_failure_is_not_success(fixture_dir, tmp_path):
     class BrokenTranslator:
         model_id = "test-only/broken"
@@ -188,3 +210,38 @@ def test_cli_manifest_option(fixture_dir, tmp_path):
     )
     assert result.exit_code == 0, result.output
     assert "verified" in result.output
+
+
+def test_unicode_fallback_preserves_fullwidth_numbers_and_marks(tmp_path):
+    if platform.system() != "Darwin" or not Settings().xelatex:
+        pytest.skip("Mac XeLaTeX fixture required")
+    source = tmp_path / "unicode.pdf"
+    fixtures.make_page(source, [(48, 48, 12, "項目１ ※")])
+    manager = JobManager(
+        Settings(data_dir=tmp_path / "jobs"), FakeTranslator({"項目KZPHAZ※": "Item KZPHAZ ※ ○"})
+    )
+    job = manager.create(source)["id"]
+    state = manager.process(job)
+    assert state["output_available"], state
+    work = manager.folder(job)
+    assert "Missing character:" not in (work / "tex/pages/page_0001.log").read_text()
+    with fitz.open(work / "translated.pdf") as pdf:
+        text = pdf[0].get_text()
+        assert "１" in text and "※" in text and "○" in text
+    rebuilt = tmp_path / "relocated.pdf"
+    assert rebuild(work / "reconstruction.zip", rebuilt, manager.settings).status != "failed"
+    with fitz.open(rebuilt) as pdf:
+        assert "１" in pdf[0].get_text() and "※" in pdf[0].get_text()
+
+
+def test_unavailable_glyph_still_blocks_export(fixture_dir, tmp_path):
+    manager = JobManager(Settings(data_dir=tmp_path / "jobs"), FakeTranslator(fixtures.REFERENCES))
+    job = manager.create(fixture_dir / "native.pdf")["id"]
+    ir = manager.ir(job)
+    block = ir.pages[0].blocks[0]
+    block.target = "Unsupported \U0010ffff"
+    block.translation_status = "edited"
+    manager.save_ir(job, ir)
+    state = manager.process(job)
+    assert not state["output_available"]
+    assert "U+10FFFF" in state["message"] and block.id in state["message"]

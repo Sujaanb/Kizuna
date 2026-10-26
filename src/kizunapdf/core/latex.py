@@ -10,7 +10,7 @@ import pikepdf
 from kizunapdf.config import Settings
 
 from .geometry import intersects, media_box
-from .models import Block, DocumentIR, Page
+from .models import Block, Diagnostic, DocumentIR, Page
 
 ESCAPE = {
     "\\": r"\textbackslash{}",
@@ -25,6 +25,26 @@ ESCAPE = {
     "~": r"\textasciitilde{}",
 }
 
+# Check the font actually selected for each character. Do not normalize protected
+# full-width numbers or replace source symbols merely to fit a Latin font.
+FONT_FALLBACKS = r"""
+\newcommand{\kzcjk}{}
+\newcommand{\kzsymbols}{}
+\IfFontExistsTF{Hiragino Sans}{\newfontfamily\kzcjkfont{Hiragino Sans}\renewcommand{\kzcjk}{\kzcjkfont}}{%
+  \IfFontExistsTF{Noto Sans CJK JP}{\newfontfamily\kzcjkfont{Noto Sans CJK JP}\renewcommand{\kzcjk}{\kzcjkfont}}{}%
+}
+\IfFontExistsTF{Apple Symbols}{\newfontfamily\kzsymbolsfont{Apple Symbols}\renewcommand{\kzsymbols}{\kzsymbolsfont}}{%
+  \IfFontExistsTF{DejaVu Sans}{\newfontfamily\kzsymbolsfont{DejaVu Sans}\renewcommand{\kzsymbols}{\kzsymbolsfont}}{}%
+}
+\newcommand{\kzchar}[2]{%
+  \iffontchar\font#1\relax#2%
+  \else{\mdseries\upshape\kzcjk%
+    \iffontchar\font#1\relax#2%
+    \else{\kzsymbols#2}\fi}%
+  \fi%
+}
+"""
+
 
 def escape_tex(text: str) -> str:
     return "".join(
@@ -32,10 +52,54 @@ def escape_tex(text: str) -> str:
     )
 
 
+def text_with_fallbacks(text: str) -> str:
+    return "".join(
+        rf"\kzchar{{{ord(char)}}}{{{escape_tex(char)}}}" if ord(char) > 127 else escape_tex(char)
+        for char in text
+    )
+
+
+def missing_glyph_details(log: str) -> str | None:
+    current_block = None
+    missing: dict[str, set[str]] = {}
+    for line in log.splitlines():
+        if line.startswith("KZBLOCK:"):
+            current_block = line.removeprefix("KZBLOCK:").strip()
+        match = re.search(r"Missing character: There is no (.*?) \(U\+([0-9A-Fa-f]+)\)", line)
+        if match:
+            label = f"{match[1]} (U+{match[2]})"
+            missing.setdefault(label, set())
+            if current_block:
+                missing[label].add(current_block)
+    if not missing:
+        return "unidentified character" if "Missing character:" in log else None
+    return "; ".join(
+        label + (" in " + ", ".join(sorted(blocks)) if blocks else "")
+        for label, blocks in missing.items()
+    )
+
+
 def layout_region(block: Block, page: Page):
     if block.table_cell:
         c = block.table_cell
-        return (max(c[0] + 2, block.bbox_unrotated[0]), block.bbox_unrotated[1], c[2] - 2, c[3] - 2)
+        x0, y0, x1, y1 = block.bbox_unrotated
+        left, right = min(x0, c[0] + 2), max(x1, c[2] - 2)
+        obstacles = [b.bbox_unrotated for b in page.blocks if b.id != block.id] + page.obstacles
+        # Share vacant horizontal space between same-row labels. A centered source
+        # label may use space to its left, but cannot cross another label or artwork.
+        for other in obstacles:
+            if min(y1, other[3]) - max(y0, other[1]) > 0.2:
+                if other[2] <= x0:
+                    left = max(left, (other[2] + x0) / 2)
+                elif other[0] >= x1:
+                    right = min(right, (x1 + other[0]) / 2)
+        bottom = max(y1, c[3] - 2)
+        # A cell can contain multiple translated lines and preserved English.
+        # Giving every line the whole remaining cell height would hide collisions.
+        for other in obstacles:
+            if min(right, other[2]) - max(left, other[0]) > 0.2 and other[1] >= y1:
+                bottom = min(bottom, other[1])
+        return (left, y0, right, bottom)
     box = list(block.bbox_unrotated)
     width = page.crop_box[2] - page.crop_box[0]
     height = page.crop_box[3] - page.crop_box[1]
@@ -61,6 +125,7 @@ def page_tex(page: Page, ratio=1.0) -> str:
 \usepackage{{fontspec,graphicx,xcolor,eso-pic}}
 \usepackage[paperwidth={mw:.5f}bp,paperheight={mh:.5f}bp,margin=0bp]{{geometry}}
 \IfFontExistsTF{{Arial}}{{\setmainfont{{Arial}}}}{{\setmainfont{{Latin Modern Sans}}}}
+{FONT_FALLBACKS}
 \pagestyle{{empty}}
 \setlength{{\unitlength}}{{1bp}}
 \setlength{{\parindent}}{{0pt}}
@@ -83,10 +148,11 @@ def page_tex(page: Page, ratio=1.0) -> str:
             block.alignment
         ]
         parts.append(rf"""% Segment {block.id}
+\typeout{{KZBLOCK:{block.id}}}
 \setbox\kzbox=\vbox{{\hsize={x1 - x0:.5f}bp\linewidth=\hsize
 \fontsize{{{fs:.4f}bp}}{{{fs * 1.16:.4f}bp}}\selectfont {align}
 \color[HTML]{{{block.rgb[1:]}}}{style}
-{escape_tex(block.target)}\par}}
+{text_with_fallbacks(block.target)}\par}}
 \typeout{{KZHEIGHT:{block.id}:\the\dimexpr\ht\kzbox+\dp\kzbox\relax}}
 \AddToShipoutPictureFG*{{\AtPageUpperLeft{{\put({x0:.5f},-{y0:.5f}){{\makebox(0,0)[lt]{{\copy\kzbox}}}}}}}}
 """)
@@ -137,37 +203,76 @@ def compile_tex(tex: Path, settings: Settings):
         raise RuntimeError(
             f"XeLaTeX failed for {tex.name}. See {tex.with_suffix('.log')}: {log[-1500:]}"
         )
-    if "Missing character:" in log:
-        raise ValueError(f"Font has missing glyphs in {tex.name}; correct text or font")
+    missing = missing_glyph_details(log)
+    if missing:
+        raise ValueError(
+            f"No available local font can render {missing} in {tex.name}. "
+            "Install a font covering these characters or edit the affected region. "
+            "No PDF was exported."
+        )
     return log
+
+
+class TypesettingError(ValueError):
+    def __init__(self, diagnostics: list[Diagnostic]):
+        self.diagnostics = diagnostics
+        pages = ", ".join(str(i + 1) for i in sorted({d.page for d in diagnostics}))
+        super().__init__(
+            f"Text overflow in {len(diagnostics)} region(s) on page(s) {pages}. "
+            "Select a text overflow issue in Quality report, shorten the English text, "
+            "then Save & rebuild. No PDF was exported."
+        )
+
+
+def horizontal_overflows(log: str) -> set[str]:
+    current_block = "unknown"
+    blocks = set()
+    for line in log.splitlines():
+        if line.startswith("KZBLOCK:"):
+            current_block = line.removeprefix("KZBLOCK:").strip()
+        elif "Overfull \\hbox" in line:
+            blocks.add(current_block)
+    return blocks
 
 
 def build_pages(ir: DocumentIR, work: Path, settings: Settings, cancel=lambda: False):
     pages_dir = work / "tex/pages"
     pages_dir.mkdir(parents=True, exist_ok=True)
+    diagnostics = []
     for page in ir.pages:
         if cancel():
             raise InterruptedError("Cancelled")
         tex = pages_dir / f"page_{page.page_index + 1:04d}.tex"
-        errors = []
+        errors = {}
         for ratio in (1.0, 0.925, settings.min_font_ratio):
             tex.write_text(page_tex(page, ratio))
             log = compile_tex(tex, settings)
             measured = dict(re.findall(r"KZHEIGHT:([^:]+):([\d.]+)pt", log))
-            errors = []
+            errors = {}
             for b in page.blocks:
                 if b.protection_mode == "translate" and b.target:
                     # TeX pt -> PDF bp.
                     actual = float(measured.get(b.id, "inf")) * 72 / 72.27
                     if actual > b.layout_bbox[3] - b.layout_bbox[1] + 0.3:
-                        errors.append(b.id)
-            if "Overfull \\hbox" in log:
-                errors.append("unbreakable_word")
+                        errors[b.id] = "The translation is too tall for the available space."
+            for block_id in sorted(horizontal_overflows(log)):
+                errors[block_id] = "A word is too wide for the available space."
             if not errors:
                 break
         if errors:
             tex.with_suffix(".pdf").unlink(missing_ok=True)
-            raise ValueError("Text overflow; shorten text or change region: " + ", ".join(errors))
+            diagnostics.extend(
+                Diagnostic(
+                    severity="needs_review",
+                    check="text_overflow",
+                    message=message + " Shorten this region's English text, then Save & rebuild.",
+                    page=page.page_index,
+                    block_id=block_id if block_id != "unknown" else None,
+                )
+                for block_id, message in errors.items()
+            )
+    if diagnostics:
+        raise TypesettingError(diagnostics)
     merge_pages(ir, work, work / "translated.pdf")
 
 

@@ -5,8 +5,8 @@ import pytest
 from kizunapdf.core.cache import TranslationCache
 from kizunapdf.core.export import safe_extract
 from kizunapdf.core.geometry import display_box, media_box, unrotate_box, vision_box
-from kizunapdf.core.latex import escape_tex
-from kizunapdf.core.models import Block, QAReport
+from kizunapdf.core.latex import escape_tex, layout_region
+from kizunapdf.core.models import Block, Page, QAReport
 from kizunapdf.core.protect import literal_errors, protect, restore
 from kizunapdf.providers.mlx_translategemma import messages
 
@@ -121,3 +121,51 @@ def test_japanese_detection_excludes_punctuation():
     assert not japanese("KizunaPDF synthetic fixture ・ 1")
     assert japanese("これは日本語です。")
     assert japanese("ﾃｽﾄ")
+
+
+def test_font_failure_identifies_unicode_and_region():
+    from kizunapdf.core.latex import missing_glyph_details
+
+    log = "KZBLOCK:p0001-b0005-1\nMissing character: There is no １ (U+FF11) in font Arial\nMissing character: There is no ※ (U+203B) in font Arial\n"
+    message = missing_glyph_details(log)
+    assert "１ (U+FF11)" in message
+    assert "※ (U+203B)" in message
+    assert "p0001-b0005-1" in message
+    assert missing_glyph_details("KZBLOCK:p1\nOutput written") is None
+
+
+def test_table_fitting_uses_left_space_but_stops_above_preserved_text():
+    cell = (40, 40, 110, 100)
+    label = Block(
+        id="label",
+        source="見出し",
+        reading_order=0,
+        bbox_pdf_pt=(70, 45, 90, 55),
+        bbox_unrotated=(70, 45, 90, 55),
+        table_cell=cell,
+    )
+    preserved = Block(
+        id="preserved",
+        source="Existing English",
+        reading_order=1,
+        bbox_pdf_pt=(45, 60, 105, 70),
+        bbox_unrotated=(45, 60, 105, 70),
+        protection_mode="protect",
+        table_cell=cell,
+    )
+    page = Page(
+        page_index=0,
+        width_pt=200,
+        height_pt=200,
+        media_box=(0, 0, 200, 200),
+        crop_box=(0, 0, 200, 200),
+        crop_offset=(0, 0),
+        rotation=0,
+        classification="native",
+        blocks=[label, preserved],
+    )
+    assert layout_region(label, page) == (42, 45, 108, 60)
+    preserved.bbox_unrotated = (95, 45, 105, 55)
+    label_box = layout_region(label, page)
+    neighbor_box = layout_region(preserved, page)
+    assert label_box[2] == neighbor_box[0]

@@ -73,8 +73,11 @@ sudo /Library/TeX/texbin/tlmgr install fontspec xcolor eso-pic geometry textpos 
 Use sudo only for a system installation you own. A user/project-local TeX Live needs
 no sudo; run its absolute `bin/universal-darwin/tlmgr` instead. `KIZUNAPDF_XELATEX` may
 point to another existing XeLaTeX. `doctor` finds `/Library/TeX/texbin` even if your shell
-PATH omits it. Source fonts use Arial when available, otherwise Latin Modern Sans.
-Synthetic Japanese fixtures require macOS Hiragino Sans.
+PATH omits it. English uses Arial when available, otherwise Latin Modern Sans.
+Characters absent from that font use Hiragino Sans (or Noto Sans CJK JP), then Apple
+Symbols (or DejaVu Sans). Full-width digits and symbols retain their original Unicode
+values. If no local font covers a character, compilation reports its code point and
+region ID and blocks export. Synthetic Japanese fixtures require macOS Hiragino Sans.
 
 Follow [MODEL_SETUP.md](MODEL_SETUP.md), accept Gemma terms, and run:
 
@@ -171,19 +174,22 @@ Default CI never downloads model weights or runs real inference. Local integrati
 requires XeLaTeX/Hiragino Sans. Benchmark receipts contain actual elapsed time and peak
 process RSS; they are measurements of the sample, not throughput promises.
 
-See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) for publication status. If
-GitHub CLI is not authenticated, install it and sign in yourself, then inspect the
-repository before creating a new public one:
+See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) for publication status.
+This checkout's `origin` is the existing [Sujaanb/Kizuna repository](https://github.com/Sujaanb/Kizuna).
+Pushing requires GitHub authentication. After installing GitHub CLI if needed, sign in
+and configure Git to use it:
 
 ```sh
 gh auth login
+gh auth setup-git
 gh auth status
 git status --short
-gh repo create kizuna-pdf --public --source=. --remote=origin --push
+git remote -v
+git push -u origin main
 ```
 
-Only run the final command if the personal-account slug is available and no different
-origin is configured. Never force-push or overwrite an existing repository. Model
+Check that `origin` points to the intended repository before pushing. Never force-push
+or overwrite an existing repository. Model
 weights, source documents, private prompts, runtime output and credentials are ignored.
 The application license is AGPL-3.0-only; model licensing remains separate.
 

@@ -66,7 +66,7 @@ material. The repository includes the generator, not generated PDFs or model art
 | Protected literals / cache | Implemented and tested | Strict markers, numeric fallback, immutable multiset, revision-aware cache |
 | Real local MLX | Implemented and tested | Actual model smoke test plus uncached native integration; token cap and end-turn fix |
 | Native source removal | Implemented and tested | Glyph redaction, protected text checks, vector/image overlap fixture, original excluded from ZIP |
-| XeLaTeX / exact geometry merge | Implemented and tested | Editable per-page TeX, measured fitting, overflow refusal, mixed boxes and orientations |
+| XeLaTeX / exact geometry merge | Implemented and tested | Editable per-page TeX, Unicode glyph fallback, measured fitting, region-specific overflow refusal, mixed boxes and orientations |
 | QA | Implemented with known blindspots | Text/geometry/collision and masked global visual metrics; semantic meaning remains human-reviewed |
 | CLI | Implemented and tested | Doctor, translate, model setup/status, manifest validation, ZIP/directory rebuild, loopback serve |
 | Browser workflow | Implemented and manually tested | Actual upload, PDF.js Japanese rendering, translation, region edit, no-inference rebuild, export links |
@@ -77,13 +77,13 @@ material. The repository includes the generator, not generated PDFs or model art
 | Offline operation | Application-level tested | Cached local model, socket-denial acceptance, local PDF.js assets; no OS packet-capture claim |
 | Setup / launcher / docs | Implemented | Executable Mac launcher, explicit model opt-in, environment checks and repair commands |
 | GitHub CI configuration | Prepared; not remotely run | Lean tests/build, no model downloads |
-| GitHub publication | Blocked by missing CLI/auth setup | No gh executable/config and no GH_TOKEN/GITHUB_TOKEN; no repo URL claimed |
+| GitHub publication | Remote linked; push requires authentication | `origin` is `https://github.com/Sujaanb/Kizuna.git`; HTTPS push dry run failed because Git has no available GitHub credentials |
 
 ## Checks and browser evidence
 
 - `.venv/bin/ruff check src tests examples scripts` — passed.
 - `.venv/bin/ruff format --check src tests examples scripts` — passed.
-- `.venv/bin/pytest -q` — **32 passed**; third-party SWIG and
+- `.venv/bin/pytest -q` — **37 passed**; third-party SWIG and
   Starlette/httpx deprecation warnings do not affect the checks.
 - `pnpm --dir frontend build` — passed TypeScript and Vite production compilation.
   Vite warns that the PDF.js application chunk is >500 kB; all assets remain local.
@@ -125,4 +125,19 @@ local and ignored. The only tracked binary is the actual synthetic UI screenshot
 No pre-existing remote was present. Git author identity was not configured, so the
 initial local commit is attributed explicitly to `Codex <codex@localhost>`, not to an
 invented user identity. Configure your preferred Git identity before future commits.
-No GitHub repository was created or pushed; installation/authentication is still needed.
+The user-created [Sujaanb/Kizuna repository](https://github.com/Sujaanb/Kizuna) is now
+configured as `origin`; it had no refs when checked. Nothing has been pushed because
+GitHub authentication is unavailable. The failed dry run did not modify the remote.
+
+## Font and table-fit regression fixes
+
+Full-width digits and reference marks can survive translation as protected content,
+but the default Latin font does not cover all of them. Generated TeX now checks each
+non-ASCII glyph and uses available local CJK/symbol fonts without changing the text.
+Synthetic integration tests verify selectable characters after compilation and a
+relocated ZIP rebuild, and verify that a genuinely unsupported glyph still blocks export.
+Table regions can use free space to the left but cannot grow through labels below them.
+Overflow diagnostics identify each affected page and region, including later pages,
+so the existing Quality report can open the corresponding editor. Dense bilingual forms
+can still require shorter translations; these fixes do not certify translation meaning
+or bypass layout checks.
